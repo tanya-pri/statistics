@@ -1,0 +1,181 @@
+---
+title:"R homework : Parcoursup 2020 data"
+author:"PRISTKNSKAIA Tatiana"
+date:"March 4th, 2022"
+output:html_document
+---
+  # context questions: -is the success rate higher for *néo - bacheliers *?
+  #do competitive programs from the overseas territories (DOM - TOM) favor local students (compared to other regions) ?
+  
+  # Session Setup:
+  
+  ```
+  r setup, include = FALSE
+  ## Do not edit this chunck
+  knitr::opts_chunk$set(echo = TRUE)
+  ```
+
+#Start your analysis by loading useful packages.
+# 1) installing libraries
+
+```{
+  r eval, message = FALSE
+}
+install.packages("tidyverse")
+library(ggplot2)
+library(readr)
+library(tibble)
+library(tidyverse)
+```
+
+# 2) Import the data: we use as_tibble function to convert the data from the file to a dataframes with the class tbl_df
+
+```{
+  r message = FALSE
+}
+institutions = as_tibble(read_tsv('institutions.tsv'))
+programs = as_tibble(read_tsv('programs.tsv'))
+
+
+# 3.1 Inspect the data to find missing values. To calculate how many programs have missing values we use the function colSum. (It considers the column as an array and returns a numeric value):
+
+```{
+  r
+}
+colSums(is.na(programs))
+```
+
+#3.2 Which one(s) and for which variable(s) ?
+
+```{
+  r
+}
+programs[which(is.na(programs$Size)), ]
+
+```
+
+#4.1 Manipulate the data. To join the two datasets in a single dataset called `data` we use the merge operation inner join (it returns all the matching raws):
+
+```{
+  r
+}
+data = institutions %>% inner_join(programs, by = c("Institution", "Institution_ID"))
+data = na.omit(dat)
+
+```
+
+#4.2 Which entry (row number) corresponds to the bachelor program "Frontieres du Vivant"?
+
+```{
+  r
+}
+which(str_detect(data[["Program"]], "Frontieres"))
+data[str_detect(data[["Program"]], "Frontieres"), ]
+print(“row: ”)
+
+```
+
+# 4.3 Explore the data: How many records do we have? Multiplying the data in rows and columns:
+
+```{
+  r
+}
+print('Total records :')
+dim(data)[1] * dim(data)[2]
+
+```
+
+# 4.4 How many higher education institutions are there in total? To show one institution ID at once to count the rows we use distinct() and nrow() functions respectively:
+
+```{
+  r
+}
+nrow(distinct(data, Institution_ID))
+print(“Higher education institutions: “)
+```
+
+# 4.5 What are the regions with the highest/lowest overall capacity? Does it make intuitive sense and why ?
+
+```{
+  r
+}
+region_size = data %>% group_by(Region)  %>%
+  summarise(institution_size = sum(Size),
+            .groups = 'drop')
+
+region_size[rownames(region_size)[which.max(region_size$institution_size)], ]
+region_size[rownames(region_size)[which.min(region_size$institution_size)], ]
+
+```
+
+
+# 5 Factors influencing admission: create a subset of data. Subset the data to those programs only and remove the variables which are not interesting in that specific context. Store the result in an object called `selective`.
+
+```{
+  r
+}
+selective = filter(
+  data,
+  Selective == "TRUE",
+  data$Size - data$Acceptations < 0,
+  Sel_applications > 0,
+  Acceptations_PC == 0
+)
+```
+
+# 6 Graphical exploration
+Plot the proportion of néo - bacheliers among those who accepted a seat against the proportion of néo -
+  bacheliers among all applicants.
+
+```{
+  r
+}
+ggplot(
+  selective,
+  aes(x = Applications_Neo_PP / Applications, y = Acceptations_Neo / Acceptations)
+) +
+  geom_point()
+```
+
+# 6.1 Repeat with female applicants instead of néo-bacheliers. To do so, substitute Acceptations_Neo with Applications_F
+
+```{
+  r
+}
+ggplot(selective,
+       aes(x = Applications_F / Applications, y = Acceptations_F / Acceptations)) +
+  geom_point()
+```
+
+# 7 Néo-bachelier applicants. Specify the test and model you use:
+
+```{
+  r
+}
+succes = c(sum(selective$Acceptations_Neo), (
+  sum(selective$Acceptations) - sum(selective$Acceptations_Neo)
+))
+trials = c(sum(selective$Applications_Neo_PP), (
+  sum(selective$Applications) - sum(selective$Applications_Neo_PP)
+))
+prop.test(x = succes, n = trials, alternative = "greater")
+```
+# 8 Female applicants. Compute the **difference of success rates** of female and male applicants. Specify the test and model you use.
+
+```{
+  r
+}
+diff_sucess <-
+  (selective$Acceptations_F / selective$Applications_F) - ((selective$Acceptations -
+                                                              selective$Acceptations_F) / (selective$Applications - selective$Applications_F)
+  )
+diff_sucess
+```
+
+```{
+  r
+}
+t.test(x = diff_sucess,
+       mu = 0,
+       alternative = "two.sided")
+```
